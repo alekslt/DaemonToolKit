@@ -39,9 +39,7 @@ user interface and several advanced features useful for scalability and long ter
 
 =item * Logging manager
 
-=item * Multiprocess job manager
-
-=item * Async queue operation
+=item * Multiprocess job manager with async queue operation
 
 =item * Routing of jobs to different, independent worker groups
 
