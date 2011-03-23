@@ -13,8 +13,7 @@ use DaemonToolKit::Config;
 use DaemonToolKit::Logger;
 use Data::Dumper;
 
-my $cf_setup = {
-    'backend' => undef, # XXX add override from caller
+my $configargs_core = {
     'system'  => {
         'hostname' => {
             'required'  => 0,
@@ -23,13 +22,15 @@ my $cf_setup = {
             'regex'     => '^[\w\-\_]+$',
         },
         'user' => {
-            'required'  => 1,
+            'required'  => 0,
             'type'      => $IN_TYPE_STR,
+            'default'   => undef,
             'regex'     => '^[\w\-\_]+$',
         },
         'group' => {
-            'required'  => 1,
+            'required'  => 0,
             'type'      => $IN_TYPE_STR,
+            'default'   => undef,
             'regex'     => '^[\w\-\_]+$',
         },
         'logdir' => {
@@ -42,12 +43,44 @@ my $cf_setup = {
             'type'      => $IN_TYPE_STR,
             'default'   => '%RUNDIR%',
         },
+        'loghandler' => {
+            'required'  => 0,
+            'type'      => $IN_TYPE_ENUM,
+            'default'   => 'syslog',
+            'enum'      => { 'syslog' => 'syslog', 'file' => 'file' },
+        },
+        'syslogfacility' => {
+            'required'  => 0,
+            'type'      => $IN_TYPE_ENUM,
+            'default'   => 'daemon',
+            'enum'      => {
+                'auth'     => 'auth',
+                'authpriv' => 'auth',
+                'cron'     => 'cron',
+                'daemon'   => 'daemon',
+                'kern'     => 'kern',
+                'lpr'      => 'lpr',
+                'mail'     => 'mail',
+                'news'     => 'news',
+                'user'     => 'user',
+                'uucp'     => 'uucp',
+                'local0'   => 'local0',
+                'local1'   => 'local1',
+                'local2'   => 'local2',
+                'local3'   => 'local3',
+                'local4'   => 'local4',
+                'local5'   => 'local5',
+                'local6'   => 'local6',
+                'local7'   => 'local7',
+            },
+        }
     },
 };
 
 sub new {
     my ($class, %opts) = @_;
     my $procname   = $opts{procname};
+    my $configargs = $opts{configargs};
     my $foreground = 0;
     my $debug      = 0;
     # XXX Use a search path for FHS compliance
@@ -79,9 +112,17 @@ sub new {
     if ( $debug ) {
         $log->global_level($LOG_DEBUG);
     }
-
+    
     # Load configuration
-    my $cf = DaemonToolKit::Config->new($cfile, $cf_setup);
+    while ( my ($core_grp, $core_data) = each %$configargs_core ) {
+        if ( exists $configargs->{$core_grp} ) {
+            croak "configargs conflicts with DaemonToolKit built-ins.";
+        }
+        
+        $configargs->{$core_grp} = $core_data;
+    }
+    
+    my $cf = DaemonToolKit::Config->new($cfile, $configargs);
     
     my $s = bless {
       cmdargs    => \@cmdargs,
