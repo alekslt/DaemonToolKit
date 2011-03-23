@@ -282,11 +282,11 @@ sub background {
         exit 0;
     }
     
-    chdir '/' or croak "Error changing working directory to /: $!\n";
-    setsid() or croak "Error starting new session: $!";
-    open (STDIN , '/dev/null') or croak "Can't read /dev/null: $!";
-    open (STDOUT, '>/dev/null') or croak "Can't write to /dev/null: $!";
-    open (STDERR, '>/dev/null') or croak "Can't write to /dev/null: $!";
+    chdir '/' or die "Error changing working directory to /: $!\n";
+    setsid()  or die "Error starting new session: $!";
+    open (STDIN , '/dev/null')  or die "Can't read /dev/null: $!";
+    open (STDOUT, '>/dev/null') or die "Can't write to /dev/null: $!";
+    open (STDERR, '>/dev/null') or die "Can't write to /dev/null: $!";
     
     return 1;
 }
