@@ -274,7 +274,7 @@ sub background {
     }
     
     $log->out($LOG_DEBUG, "Daemonizing");
-    defined (my $pid = fork) or croak "Error forking process: $!";
+    defined (my $pid = fork) or die "Error forking process: $!";
     if ( $pid ) {
         # Parent, report and exit
         $s->write_pid($pid);
