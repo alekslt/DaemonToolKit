@@ -302,8 +302,8 @@ sub drop_privs {
 sub write_pid {
     my ($s, $pid) = @_;
     my $pidfile = $s->{pidfile};
-    open my $fh, '>', $pidfile or croak "Error opening $pidfile for writing: $!";
-    print $fh "$pid" or croak "Error writing to pidfile $pidfile: $!";
+    open my $fh, '>', $pidfile or die "Error opening $pidfile for writing: $!";
+    print $fh "$pid" or die "Error writing to pidfile $pidfile: $!";
     close $fh;
 }
 
@@ -312,7 +312,7 @@ sub get_pid {
     my $pidfile = $s->{pidfile};
     return 0 if ! -r $pidfile;
     
-    open my $fh, '<', $pidfile or croak "Cannot open pidfile $pidfile for reading: $!";
+    open my $fh, '<', $pidfile or die "Cannot open pidfile $pidfile for reading: $!";
     my $line = <$fh>;
     close $fh;
     
@@ -339,7 +339,7 @@ sub check_pid_running {
 sub unlink_pid {
     my ($s) = @_;
     my $pidfile = $s->{pidfile};
-    unlink $pidfile or croak "Error removing pidfile $pidfile: $!";
+    unlink $pidfile or die "Error removing pidfile $pidfile: $!";
 }
 
 1;
