@@ -2,7 +2,7 @@ package DaemonToolKit::Daemon;
 
 use warnings;
 use strict;
-
+use feature qw(say switch);
 use Carp;
 use POSIX qw(setsid);
 use Getopt::Long;
@@ -132,28 +132,29 @@ sub new {
       cf         => $cf
     } => $class;
     
-    my $action = $ARGV[0] || '';
-    if ( $action eq 'start' ) {
-        $s->cmd_start;
-    }
-    elsif ( $action eq 'stop' ) {
-        $s->cmd_stop;
-    }
-    elsif ( $action eq 'reload' ) {
-        $s->cmd_reload;
-    }
-    elsif ( $action eq 'restart' ) {
-        $s->cmd_restart;
-    }
-    elsif ( $action eq 'status' ) {
-        $s->cmd_status;
-    }
-    elsif ( $action eq 'version' ) {
-        print STDERR "$procname $main::VERSION\n";
-        exit 0;
-    }
-    else {
-        $s->show_help;
+    given (shift @ARGV) {
+        when ('start') {
+            $s->cmd_start;
+        }
+        when ('stop') {
+            $s->cmd_stop;
+        }
+        when ('reload') {
+            $s->cmd_reload;
+        }
+        when ('restart') {
+            $s->cmd_restart;
+        }
+        when ('status') {
+            $s->cmd_status;
+        }
+        when ('version') {
+            say STDERR "$procname $main::VERSION";
+            exit 0;
+        }
+        default {
+            $s->show_help;
+        }
     }
 
     return $s;
@@ -164,19 +165,19 @@ sub show_help {
     my $procname = $s->{procname};
     my @cmdargs  = @{$s->{cmdargs}};    
     
-    print STDERR "Usage: \n";
-    print STDERR "  $procname [options] { start | stop | reload | restart | status | version }\n\n";
-    print STDERR "Options:\n";    
+    say STDERR 'Usage:';
+    say STDERR '  $procname [options] { start | stop | reload | restart | status | version }', "\n";
+    say STDERR 'Options:';    
     
     for my $arg ( @cmdargs ) {
         my @a = @$arg;
         next if !$a[2];
         
-        print STDERR "   ", $a[2], "\n";
+        say STDERR '   ', $a[2];
         if ( $a[3] ) {
-            print STDERR "      ", $a[3], "\n";
+            say STDERR '      ', $a[3];
         }
-        print STDERR "\n";
+        say STDERR '';
     }
     
     exit 0;
@@ -241,7 +242,7 @@ sub cmd_stop {
         
         sleep 0.5 if $i == 1;
         if ( !$s->check_pid_running ) {
-            print "stopped.\n";
+            say 'stopped';
             last;
         }
         
@@ -268,7 +269,7 @@ sub background {
     
     if ( $foreground ) {
         $s->write_pid($$);
-        print "started.\n";
+        say 'started.';
         return;
     }
     
@@ -277,7 +278,7 @@ sub background {
     if ( $pid ) {
         # Parent, report and exit
         $s->write_pid($pid);
-        print "started.\n";
+        say 'started.';
         exit 0;
     }
     
