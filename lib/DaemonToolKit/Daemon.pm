@@ -166,7 +166,7 @@ sub show_help {
     my @cmdargs  = @{$s->{cmdargs}};    
     
     say STDERR 'Usage:';
-    say STDERR '  $procname [options] { start | stop | reload | restart | status | version }', "\n";
+    say STDERR "  $procname [options] { start | stop | reload | restart | status | version }\n";
     say STDERR 'Options:';    
     
     for my $arg ( @cmdargs ) {
