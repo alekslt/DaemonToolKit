@@ -6,6 +6,8 @@ use warnings;
 use IO::Handle;
 use Fcntl ':flock';
 use List::Util qw(min);
+use Unix::Syslog qw(:subs :macros);
+#use Unix::Syslog qw(:macros);
 
 use vars qw(@ISA @EXPORT);
 require Exporter;
@@ -44,6 +46,8 @@ sub new {
         logfile_lvl  => $LOG_INFO,
         logfile_fd   => undef,
         logfiledir   => undef,
+        syslog       => undef,
+        syslog_lvl   => $LOG_INFO,
         prefix       => \@prefix,
         instance     => undef,
         applprefix   => '',
@@ -115,9 +119,31 @@ sub logfile_disable {
     $self->{'logfile_fd'} = undef;
 }
 
+
 sub logfile_dir {
     my ($self, $dir) = @_;
     $self->{'logfiledir'} = $dir;
+}
+
+sub syslog_enable {
+    my ($self, $ident, $facility) = @_;
+    $self->{syslog} = 1;
+    
+    openlog $ident, LOG_PID, $facility;
+    
+    # syslog should be started early, so we don't bother with cache.
+    return 1;
+}
+
+sub syslog_level {
+	my ($s, $level) = @_;
+	
+	if ( defined $level ) {
+	    $s->{syslog_lvl} = $level;
+	    return $level;
+	}
+	
+	return $s->{syslog_lvl};
 }
 
 sub reopen {
@@ -141,6 +167,8 @@ sub out {
     my $logfile_lvl  = $self->{'logfile_lvl'};
     my $terminal     = $self->{'terminal'};
     my $terminal_lvl = $self->{'terminal_lvl'};
+    my $syslog       = $self->{'syslog'};
+    my $syslog_lvl   = $self->{'syslog_lvl'};
     
     # Buffer if logfile is disabled
     if ( !$logfile ) {
@@ -148,15 +176,20 @@ sub out {
     }
 
     # Determine what we're going to log to, depending on set levels
-    my $log_to_term = undef;
-    my $log_to_file = undef;
-
+    my $log_to_term   = undef;
+    my $log_to_file   = undef;
+    my $log_to_syslog = undef;
+    
     if ( $terminal && $terminal_lvl <= $level ) {
     	$log_to_term = 1;
     }
     
     if ( $logfile && $logfile_lvl <= $level ) {
     	$log_to_file = 1;
+    }
+    
+    if ( $syslog && $syslog_lvl <= $level ) {
+        $log_to_syslog = 1;
     }
    
     # If we don't have anything to do, return early.
@@ -169,6 +202,7 @@ sub out {
     my $prefix      = $self->{'prefix'};
     my $applprefix  = $self->{'applprefix'};
     my $levelprefix;
+    my $sysloglevel = LOG_INFO;
     my $realprefix  = '';
     chomp $msg;
     
@@ -179,18 +213,23 @@ sub out {
     # Sort of ugly
     if ( $level == $LOG_DEBUG ) {
         $levelprefix = 'DEBUG  ';
+        $sysloglevel = LOG_DEBUG;
     }
     elsif ( $level == $LOG_DETAIL ) {
         $levelprefix = 'DETAIL ';
+        $sysloglevel = LOG_DEBUG;
     }
     elsif ( $level == $LOG_INFO ) {
         $levelprefix = 'INFO   ';
+        $sysloglevel = LOG_INFO;
     }
     elsif ( $level == $LOG_WARN ) {
         $levelprefix = 'WARN   ';
+        $sysloglevel = LOG_WARNING;
     }
     elsif ( $level == $LOG_ERR ) {
         $levelprefix = 'ERROR  ';
+        $sysloglevel = LOG_ERR;
     }
     
     # Lock logfile, and make sure we are at EOF when getting the lock.
@@ -212,6 +251,10 @@ sub out {
         
         if ( $log_to_file ) {
             print {$logfile_fd} '[', $time, '] ', $levelprefix, $realprefix, $line, "\n";
+        }
+        
+        if ( $log_to_syslog ) {
+            syslog LOG_INFO, $realprefix . $line;
         }
     }
     

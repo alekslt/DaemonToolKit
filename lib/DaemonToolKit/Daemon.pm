@@ -12,6 +12,19 @@ use DaemonToolKit::Validate;
 use DaemonToolKit::Config;
 use DaemonToolKit::Logger;
 use Data::Dumper;
+use Unix::Syslog qw(:macros);
+
+use vars qw(@ISA @EXPORT);
+require Exporter;
+@ISA = qw(Exporter);
+
+@EXPORT = qw(
+  $DT_FILELAYOUT_FHS
+  $DT_FILELAYOUT_ENTERPRISE
+);
+
+our $DT_FILELAYOUT_FHS        = 0;
+our $DT_FILELAYOUT_ENTERPRISE = 1;
 
 my $configargs_core = {
     'system'  => {
@@ -52,26 +65,27 @@ my $configargs_core = {
         'syslogfacility' => {
             'required'  => 0,
             'type'      => $IN_TYPE_ENUM,
-            'default'   => 'daemon',
+            'default'   => LOG_DAEMON,
             'enum'      => {
-                'auth'     => 'auth',
-                'authpriv' => 'auth',
-                'cron'     => 'cron',
-                'daemon'   => 'daemon',
-                'kern'     => 'kern',
-                'lpr'      => 'lpr',
-                'mail'     => 'mail',
-                'news'     => 'news',
-                'user'     => 'user',
-                'uucp'     => 'uucp',
-                'local0'   => 'local0',
-                'local1'   => 'local1',
-                'local2'   => 'local2',
-                'local3'   => 'local3',
-                'local4'   => 'local4',
-                'local5'   => 'local5',
-                'local6'   => 'local6',
-                'local7'   => 'local7',
+                'auth'     => LOG_AUTHPRIV,
+                'authpriv' => LOG_AUTHPRIV,
+                'cron'     => LOG_CRON,
+                'daemon'   => LOG_DAEMON,
+                'ftp'      => LOG_FTP,
+                'kern'     => LOG_KERN,
+                'lpr'      => LOG_LPR,
+                'mail'     => LOG_MAIL,
+                'news'     => LOG_NEWS,
+                'user'     => LOG_USER,
+                'uucp'     => LOG_UUCP,
+                'local0'   => LOG_LOCAL0,
+                'local1'   => LOG_LOCAL1,
+                'local2'   => LOG_LOCAL2,
+                'local3'   => LOG_LOCAL3,
+                'local4'   => LOG_LOCAL4,
+                'local5'   => LOG_LOCAL5,
+                'local6'   => LOG_LOCAL6,
+                'local7'   => LOG_LOCAL7
             },
         }
     },
@@ -81,11 +95,32 @@ sub new {
     my ($class, %opts) = @_;
     my $procname   = $opts{procname};
     my $configargs = $opts{configargs};
+    my $layout     = $opts{layout} || $DT_FILELAYOUT_FHS;
+
     my $foreground = 0;
     my $debug      = 0;
-    # XXX Use a search path for FHS compliance
-    my $cfile      = "$FindBin::Bin/../conf/$procname.cf";
-    my $pidfile    = "$FindBin::Bin/../run/pid";
+    
+    # Default to either FHS or "enterprise" layout
+    my ($d_cfile, $d_pidfile, $d_logdir);
+    given ($layout) {
+        when ($DT_FILELAYOUT_FHS) {
+            $d_cfile   = '/etc/' . $procname . '.cf';
+            $d_pidfile = '/var/run/' . $procname . '/pid';
+            $d_logdir  = '/var/log';
+        }
+        when ($DT_FILELAYOUT_ENTERPRISE) {
+            $d_cfile   = "$FindBin::Bin/../conf/$procname.cf";
+            $d_pidfile = "$FindBin::Bin/../run/pid";
+            $d_logdir  = "$FindBin::Bin/../log";
+        }
+        default {
+            croak "Unknown file layout";
+        }
+    }
+    
+    my $cfile   = $opts{conffile} || $d_cfile;
+    my $pidfile = $opts{pidfile}  || $d_pidfile;
+    my $logdir  = $opts{logdir}   || $d_logdir;
     
     # Compose list of standard options and add the supplied ones to it
     my @cmdargs = (
@@ -122,14 +157,20 @@ sub new {
         $configargs->{$core_grp} = $core_data;
     }
     
+    
     my $cf = DaemonToolKit::Config->new($cfile, $configargs);
+    
+    say Dumper($cf);
     
     my $s = bless {
       cmdargs    => \@cmdargs,
       foreground => $foreground,
       pidfile    => $pidfile,
       procname   => $procname,
-      cf         => $cf
+      cf         => $cf,
+      cfile      => $cfile,
+      pidfile    => $pidfile,
+      logdir     => $logdir
     } => $class;
     
     given (shift @ARGV) {
@@ -191,9 +232,14 @@ sub cmd_restart {
 
 sub cmd_start {
     my ($s) = @_;
-    my $procname = $s->{procname};
-    my $wsetup   = $s->{workers};
-    my $cb_load  = $s->{cb_load};
+    my $procname       = $s->{procname};
+    my $wsetup         = $s->{workers};
+    my $cb_load        = $s->{cb_load};
+    my $cf             = $s->{cf};
+    my $loghandler     = $cf->{system}->{loghandler};
+    my $syslogfacility = $cf->{system}->{syslogfacility};
+    my $logdir         = $s->{logdir};
+    
     local $|;
     $| = 1;
     
@@ -208,8 +254,16 @@ sub cmd_start {
     print "Starting $procname.. ";
 
     # Enable logging to file
-    $log->logfile_dir($s->{cf}->{system}->{logdir});
-    $log->logfile_enable($procname);
+    given ($loghandler) {
+        when ('syslog') {
+            $log->syslog_enable($procname, $syslogfacility);
+        }
+        when ('file') {
+            $log->logfile_dir($logdir);
+            $log->logfile_enable($procname);
+        }
+    }
+    
     
     # Deamonize
     $s->background;
