@@ -254,7 +254,7 @@ sub out {
         }
         
         if ( $log_to_syslog ) {
-            syslog LOG_INFO, $realprefix . $line;
+            syslog $sysloglevel, $realprefix . $line;
         }
     }
     
